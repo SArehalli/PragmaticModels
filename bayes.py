@@ -49,15 +49,13 @@ class model:
                else 0
 
     # Pragmatic Speaker
-    # return p(utterance | world) = exp(rationality * (utility - cost(utterance)))
+    # return p(utterance | world, context) = exp(rationality * (utility - cost(utterance)))
     def makePragSpeaker(self, listener):
 
-        # and the normed distribution p(u | w, V)
         def speaker(utterance, world, context):
 
-            l = lambda w, c, u : listener(w, c, u)
             # the soft-max utility  
-            softmax = lambda u, w, c: math.exp(self.rationality * (self.utility(l, w, c, u) - self.cost(u)))
+            softmax = lambda u, w, c: math.exp(self.rationality * (self.utility(listener, w, c, u) - self.cost(u)))
 
             norm = sum(map(lambda u : softmax(u, world, context), 
                        self.lexicon)) 
@@ -118,12 +116,12 @@ if __name__ == "__main__":
     test_mod = model(worlds = [x/precision for x in range(0, precision + 1)],               # Height of subject
                      lexicon = ["", "tall", "short"],                                       # Labels
                      contexts = [x/precision for x in range(0, precision + 1)],             # Height of subject
-                     prior_worlds = lambda w : norm.pdf(w, mean, stddev)/(precision + 1),   # some sort of prior ???
+                     prior_worlds = lambda w : norm.pdf(w, mean, stddev)/(precision + 1),   # Normal prior
                      utility = lambda l, w, c, u : math.log(l(w, c, u)) if l(w, c, u) != 0 else -10000,
                      semantics = lambda w, u, c : 0 if ((u == "tall" and w < c) or \
                                                         (u == "short" and w > c)) \
                                                     else 1,                                 # 
-                     cost = lambda u : 0.6 * len(u.split()),                                # Cost function - currently uniform 0
+                     cost = lambda u : 0.6 * len(u.split()),                                # Cost function 
                      rationality = 4)                                                       # Rationality
 
     L0 = test_mod.getPragListener(0)
@@ -131,8 +129,6 @@ if __name__ == "__main__":
     L1 = test_mod.getPragListener(1)
 
     domain = [(x,y) for x in test_mod.worlds for y in test_mod.contexts]
-    #joint_dist = list(zip(domain, list(map(lambda x : L1(x[0], x[1], "tall"), 
-    #                                       domain))))
     
     # Plot marginals
 
@@ -141,31 +137,22 @@ if __name__ == "__main__":
     p1_world = [sum([L1(world, context, "tall") for context in test_mod.contexts]) for world in test_mod.worlds]
     p1_context = [sum([L1(world, context, "tall") for world in test_mod.worlds]) for context in test_mod.contexts]
 
-    context = [[L1(world, context, "tall") for world in test_mod.worlds] for context in test_mod.contexts]
-    for x in context:
-        print(("{:.2f}  " * 10).format(*x))
-
-    input()
-
     f, ((ax01, ax11, ax21), (ax02, ax12, ax22)) = plt.subplots(2,3, sharey="row")
 
+
+    # Don't mind the visualization - it's pretty bad. Need to find a better way to deal with continuous distributions
+    ax01.set_ylabel("Heights")
+    ax02.set_ylabel("Thresholds")
+    ax02.set_xlabel("Priors")
     sns.barplot(test_mod.worlds, list(map(test_mod.prior_worlds, test_mod.worlds)), ax = ax01)
     sns.barplot(test_mod.contexts, list(map(test_mod.prior_contexts, test_mod.contexts)), ax = ax02)
+
+    ax12.set_xlabel("Literal Listener")
     sns.barplot(test_mod.worlds, p0_world, ax = ax11)
     sns.barplot(test_mod.contexts, p0_context, ax = ax12)
+
+    ax22.set_xlabel("L1 Listener")
     sns.barplot(test_mod.worlds, p1_world, ax = ax21)
     sns.barplot(test_mod.contexts, p1_context, ax = ax22)
     sns.plt.show()
 
-    """ # Joint distribution plotting
-    xs = []
-    ys = []
-    for entry in joint_dist:
-        (x,y) = entry[0]
-        num_coord = int(1000 * entry[1])
-        xs += [x for i in range(num_coord)]
-        ys += [y for i in range(num_coord)]
-    xs = pd.Series(xs, name="height")
-    ys = pd.Series(ys, name="threshold")
-    sns.jointplot(xs, ys, xlim=(0,1), ylim=(0,1), kind="kde")
-    """
